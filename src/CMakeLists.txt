@@ -1,6 +1,6 @@
-
 # Add source to this project's executable.
-add_library (vkguide_shared STATIC
+add_executable (engine 
+  main.cpp
   vk_types.h
   vk_initializers.cpp
   vk_initializers.h
@@ -10,17 +10,23 @@ add_library (vkguide_shared STATIC
   vk_descriptors.cpp
   vk_pipelines.h
   vk_pipelines.cpp
+  vk_engine.h
+  vk_engine.cpp
+  vk_loader.h
+  vk_loader.cpp
   camera.cpp
   camera.h
-  meshes.h
-  meshes.cpp
 )
 
-set_property(TARGET vkguide_shared PROPERTY CXX_STANDARD 20)
-target_compile_definitions(vkguide_shared PUBLIC GLM_FORCE_DEPTH_ZERO_TO_ONE)
+set_property(TARGET engine PROPERTY CXX_STANDARD 20)
+target_compile_definitions(engine PUBLIC GLM_FORCE_DEPTH_ZERO_TO_ONE)
+target_include_directories(engine PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 
-target_include_directories(vkguide_shared PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
+target_link_libraries(engine PUBLIC vma glm Vulkan::Vulkan fmt::fmt stb_image SDL2::SDL2 vkbootstrap imgui fastgltf::fastgltf)
 
-target_link_libraries(vkguide_shared PUBLIC vma glm Vulkan::Vulkan fmt::fmt stb_image SDL2::SDL2)
+target_precompile_headers(engine PUBLIC <optional> <vector> <memory> <string> <vector> <unordered_map> <glm/mat4x4.hpp>  <glm/vec4.hpp> <vulkan/vulkan.h>)
 
-target_precompile_headers(vkguide_shared PUBLIC <optional> <vector> <memory> <string> <vector> <unordered_map> <glm/mat4x4.hpp>  <glm/vec4.hpp> <vulkan/vulkan.h>)
+add_custom_command(TARGET engine POST_BUILD
+  COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_RUNTIME_DLLS:engine> $<TARGET_FILE_DIR:engine>
+  COMMAND_EXPAND_LISTS
+  )
