@@ -46,6 +46,7 @@ struct ComputePushConstants {
 	glm::vec4 data2;
 	glm::vec4 data3;
 	glm::vec4 data4;
+	float var1,var2,var3,var4,var5,var6,var7,var8,var9;
 };
 
 struct ComputeEffect {

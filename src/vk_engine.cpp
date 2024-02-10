@@ -66,7 +66,7 @@ void VulkanEngine::init_default_data() {
 	//> init_data
 	std::array<Vertex, 4> rect_vertices;
 
-	rect_vertices[0].position = { 0.5,-0.5, 0 };
+	rect_vertices[0].position = { 1.5,-0.5, 0 };
 	rect_vertices[1].position = { 0.5,0.5, 0 };
 	rect_vertices[2].position = { -0.5,-0.5, 0 };
 	rect_vertices[3].position = { -0.5,0.5, 0 };
@@ -263,7 +263,7 @@ void VulkanEngine::draw()
 	vkutil::transition_image(cmd, _drawImage.image, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 	vkutil::transition_image(cmd, _depthImage.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
 
-	draw_geometry(cmd);
+	//draw_geometry(cmd); //uncomment
 
 	//transtion the draw image and the swapchain image into their correct transfer layouts
 	vkutil::transition_image(cmd, _drawImage.image, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
@@ -320,6 +320,7 @@ void VulkanEngine::draw()
 		resize_requested = true;
 		return;
 	}
+	backgroundEffects.at(0).data.var8 =_frameNumber;
 	//increase the number of frames drawn
 	_frameNumber++;
 }
@@ -431,18 +432,26 @@ void VulkanEngine::run()
 
 		if (ImGui::Begin("background")) {
 
-			ImGui::SliderFloat("Render Scale", &renderScale, 0.3f, 1.f);
+			//ImGui::SliderFloat("Render Scale", &renderScale, 0.3f, 1.f);//uncomment
 
 			ComputeEffect& selected = backgroundEffects[currentBackgroundEffect];
 
 			ImGui::Text("Selected effect: ", selected.name);
 
-			ImGui::SliderInt("Effect Index", &currentBackgroundEffect, 0, backgroundEffects.size() - 1);
+			//ImGui::SliderInt("Effect Index", &currentBackgroundEffect, 0, backgroundEffects.size() - 1); //uncomment
 
-			ImGui::InputFloat4("data1", (float*)&selected.data.data1);
-			ImGui::InputFloat4("data2", (float*)&selected.data.data2);
-			ImGui::InputFloat4("data3", (float*)&selected.data.data3);
-			ImGui::InputFloat4("data4", (float*)&selected.data.data4);
+			ImGui::InputFloat("Seed", (float*)&selected.data.var1);
+			ImGui::InputFloat("Temperature", (float*)&selected.data.var2);
+			ImGui::InputFloat("Biomass", (float*)&selected.data.var3);
+			ImGui::InputFloat("Waterlevel", (float*)&selected.data.var4);
+			ImGui::InputFloat("Ozone", (float*)&selected.data.var5);
+			ImGui::InputFloat("Planet Size", (float*)&selected.data.var6);
+			ImGui::InputFloat("Rotation", (float*)&selected.data.var7);
+			ImGui::InputFloat3("Sun Color", (float*)&selected.data.data1);
+			ImGui::InputFloat3("Sun Position", (float*)&selected.data.data2);
+			ImGui::InputFloat("Frame", (float*)&selected.data.var8);
+			/*ImGui::InputFloat4("data3", (float*)&selected.data.data3);
+			ImGui::InputFloat4("special", (float*)&selected.data.data4);*/
 
 			ImGui::End();
 		}
@@ -681,8 +690,8 @@ void VulkanEngine::init_background_pipelines()
 
 	VK_CHECK(vkCreatePipelineLayout(_device, &computeLayout, nullptr, &_gradientPipelineLayout));
 
-	VkShaderModule gradientShader;
-	if (!vkutil::load_shader_module("../../vulkan-from-scratch/shaders/gradient_color.comp.spv", _device, &gradientShader)) {
+	VkShaderModule planetShader;
+	if (!vkutil::load_shader_module("../../vulkan-from-scratch/shaders/myshader.spv", _device, &planetShader)) {
 		std::cout << "Error when building the compute shader" << std::endl;
 	}
 
@@ -695,7 +704,7 @@ void VulkanEngine::init_background_pipelines()
 	stageinfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
 	stageinfo.pNext = nullptr;
 	stageinfo.stage = VK_SHADER_STAGE_COMPUTE_BIT;
-	stageinfo.module = gradientShader;
+	stageinfo.module = planetShader;
 	stageinfo.pName = "main";
 
 	VkComputePipelineCreateInfo computePipelineCreateInfo{};
@@ -704,16 +713,24 @@ void VulkanEngine::init_background_pipelines()
 	computePipelineCreateInfo.layout = _gradientPipelineLayout;
 	computePipelineCreateInfo.stage = stageinfo;
 
-	ComputeEffect gradient;
-	gradient.layout = _gradientPipelineLayout;
-	gradient.name = "gradient";
-	gradient.data = {};
+	ComputeEffect planet;
+	planet.layout = _gradientPipelineLayout;
+	planet.name = "planet";
+	planet.data = {};
 
 	//default colors
-	gradient.data.data1 = glm::vec4(1, 0, 0, 1);
-	gradient.data.data2 = glm::vec4(0, 0, 1, 1);
+	planet.data.var1 = 3.95;
+	planet.data.var2 = 0.0;
+	planet.data.var3 = 0.5;
+	planet.data.var4 = 1.0;
+	planet.data.var5 = 1.0;
+	planet.data.var6 = 200.0;
+	planet.data.var7 = 0.001;
+	planet.data.var8 = 0.0;
+	planet.data.data1 = glm::vec4(1.0, 1.0, 1.0, 1.0);
+	planet.data.data2 = glm::vec4(0.6, 0.2, 0.5, 1.0);
 
-	VK_CHECK(vkCreateComputePipelines(_device, VK_NULL_HANDLE, 1, &computePipelineCreateInfo, nullptr, &gradient.pipeline));
+	VK_CHECK(vkCreateComputePipelines(_device, VK_NULL_HANDLE, 1, &computePipelineCreateInfo, nullptr, &planet.pipeline));
 
 	//change the shader module only to create the sky shader
 	computePipelineCreateInfo.stage.module = skyShader;
@@ -728,16 +745,16 @@ void VulkanEngine::init_background_pipelines()
 	VK_CHECK(vkCreateComputePipelines(_device, VK_NULL_HANDLE, 1, &computePipelineCreateInfo, nullptr, &sky.pipeline));
 
 	//add the 2 background effects into the array
-	backgroundEffects.push_back(gradient);
+	backgroundEffects.push_back(planet);
 	backgroundEffects.push_back(sky);
 
 	//destroy structures properly
-	vkDestroyShaderModule(_device, gradientShader, nullptr);
+	vkDestroyShaderModule(_device, planetShader, nullptr);
 	vkDestroyShaderModule(_device, skyShader, nullptr);
 	_mainDeletionQueue.push_function([&]() {
 		vkDestroyPipelineLayout(_device, _gradientPipelineLayout, nullptr);
 		vkDestroyPipeline(_device, sky.pipeline, nullptr);
-		vkDestroyPipeline(_device, gradient.pipeline, nullptr);
+		vkDestroyPipeline(_device, planet.pipeline, nullptr);
 		});
 }
 
@@ -796,7 +813,7 @@ void VulkanEngine::init_pipelines()
 	// GRAPHICS PIPELINES
 	init_triangle_pipeline();
 
-	init_mesh_pipeline();
+	//init_mesh_pipeline(); //uncomment
 }
 
 void VulkanEngine::init_triangle_pipeline()
